@@ -312,6 +312,44 @@ function EmptyState({ message }) {
   );
 }
 
+
+function ShortcutPanel() {
+  return (
+    <section className="shortcut-panel" aria-label="???????">
+      <div className="shortcut-header">
+        <h2 className="shortcut-title">???????</h2>
+        <span className="shortcut-note">PC??</span>
+      </div>
+      <div className="shortcut-grid">
+        <div className="shortcut-item">
+          <kbd>1-9</kbd>
+          <span>??????/??</span>
+        </div>
+        <div className="shortcut-item">
+          <kbd>C</kbd>
+          <span>??/??????</span>
+        </div>
+        <div className="shortcut-item">
+          <kbd>B</kbd>
+          <span>?????????</span>
+        </div>
+        <div className="shortcut-item">
+          <kbd>? / ?</kbd>
+          <span>?/???????</span>
+        </div>
+        <div className="shortcut-item">
+          <kbd>? / ?</kbd>
+          <span>?/???????</span>
+        </div>
+        <div className="shortcut-item">
+          <kbd>Esc</kbd>
+          <span>????????</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DatasetItem({
   dataset,
   filtered,
@@ -689,11 +727,16 @@ function App() {
   }
 
   function handleCheckAnswer(question) {
-    setShowAnswer(true);
-    const result = evaluateSelection(question, selectedOptions);
-    if (settings.autoComplete && result.allCorrectSelected) {
-      updateProgress(question.category, question.id, { status: "completed" });
-    }
+    setShowAnswer((prev) => {
+      const next = !prev;
+      if (next) {
+        const result = evaluateSelection(question, selectedOptions);
+        if (settings.autoComplete && result.allCorrectSelected) {
+          updateProgress(question.category, question.id, { status: "completed" });
+        }
+      }
+      return next;
+    });
   }
 
   function handleSelect(datasetKey, questionId) {
@@ -708,7 +751,12 @@ function App() {
 
   function renderMain() {
     if (!selected) {
-      return <EmptyState message="右のフォルダから問題を選択してください" />;
+      return (
+        <div className="main-stack">
+          <EmptyState message="右のフォルダから問題を選択してください" />
+          <ShortcutPanel />
+        </div>
+      );
     }
 
     const ds = datasets.find((d) => d.key === selected.datasetKey);
@@ -726,24 +774,27 @@ function App() {
     const correctSet = new Set(correctIndices);
 
     return (
-      <QuestionCard
-        question={q}
-        datasetLabel={ds.label}
-        progressEntry={progressEntry}
-        selectedOptions={selectedOptions}
-        showAnswer={showAnswer}
-        correctSet={correctSet}
-        images={images}
-        hasPrev={hasPrev}
-        hasNext={hasNext}
-        onToggleCompleted={toggleCompleted}
-        onToggleBookmark={toggleBookmark}
-        onToggleOption={toggleOption}
-        onCheckAnswer={() => handleCheckAnswer(q)}
-        onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
-        onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
-        onOpenImage={setLightboxSrc}
-      />
+      <div className="main-stack">
+        <QuestionCard
+          question={q}
+          datasetLabel={ds.label}
+          progressEntry={progressEntry}
+          selectedOptions={selectedOptions}
+          showAnswer={showAnswer}
+          correctSet={correctSet}
+          images={images}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          onToggleCompleted={toggleCompleted}
+          onToggleBookmark={toggleBookmark}
+          onToggleOption={toggleOption}
+          onCheckAnswer={() => handleCheckAnswer(q)}
+          onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
+          onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
+          onOpenImage={setLightboxSrc}
+        />
+        <ShortcutPanel />
+      </div>
     );
   }
 
