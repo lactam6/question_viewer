@@ -74,10 +74,26 @@ async function listJsonFiles() {
     // ignore and fallback
   }
 
-  const manifestRes = await fetch("./data/manifest.json");
-  if (!manifestRes.ok) {
-    throw new Error("dataフォルダ内のJSON一覧を取得できませんでした。");
+  const manifestCandidates = ["./data/manifest.json", "./application/data/manifest.json"];
+  let manifestRes = null;
+  for (const path of manifestCandidates) {
+    try {
+      const res = await fetch(path, { cache: "no-store" });
+      if (res.ok) {
+        manifestRes = res;
+        break;
+      }
+    } catch (err) {
+      // continue
+    }
   }
+
+  if (!manifestRes) {
+    throw new Error(
+      "dataフォルダ内のJSON一覧を取得できませんでした。manifest.json が公開されているか確認してください。"
+    );
+  }
+
   const manifest = await manifestRes.json();
   if (Array.isArray(manifest)) return manifest;
   if (Array.isArray(manifest.files)) return manifest.files;
