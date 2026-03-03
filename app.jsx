@@ -20,6 +20,19 @@ const THEME_OPTIONS = [
   { key: "dark", label: "Dark" },
 ];
 
+const SHORTCUT_LABELS = {
+  title: "\u30b7\u30e7\u30fc\u30c8\u30ab\u30c3\u30c8",
+  buttonOpen: "\u30b7\u30e7\u30fc\u30c8\u30ab\u30c3\u30c8\u30ad\u30fc\u4e00\u89a7\u3092\u8868\u793a",
+  buttonClose: "\u30b7\u30e7\u30fc\u30c8\u30ab\u30c3\u30c8\u3092\u9589\u3058\u308b",
+  pcOnly: "PC\u306e\u307f",
+  select: "\u9078\u629e\u80a2\u3092\u9078\u629e/\u89e3\u9664",
+  complete: "\u5b8c\u4e86/\u672a\u5b8c\u4e86\u306e\u5207\u66ff",
+  bookmark: "\u30d6\u30c3\u30af\u30de\u30fc\u30af\u306e\u5207\u66ff",
+  nav: "\u524d/\u6b21\u306e\u554f\u984c\u3078\u79fb\u52d5",
+  closeImage: "\u753b\u50cf\u62e1\u5927\u3092\u9589\u3058\u308b",
+};
+
+
 function loadStoredJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -313,42 +326,6 @@ function EmptyState({ message }) {
 }
 
 
-function ShortcutPanel() {
-  return (
-    <section className="shortcut-panel" aria-label="???????">
-      <div className="shortcut-header">
-        <h2 className="shortcut-title">???????</h2>
-        <span className="shortcut-note">PC??</span>
-      </div>
-      <div className="shortcut-grid">
-        <div className="shortcut-item">
-          <kbd>1-9</kbd>
-          <span>??????/??</span>
-        </div>
-        <div className="shortcut-item">
-          <kbd>C</kbd>
-          <span>??/??????</span>
-        </div>
-        <div className="shortcut-item">
-          <kbd>B</kbd>
-          <span>?????????</span>
-        </div>
-        <div className="shortcut-item">
-          <kbd>? / ?</kbd>
-          <span>?/???????</span>
-        </div>
-        <div className="shortcut-item">
-          <kbd>? / ?</kbd>
-          <span>?/???????</span>
-        </div>
-        <div className="shortcut-item">
-          <kbd>Esc</kbd>
-          <span>????????</span>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function DatasetItem({
   dataset,
@@ -434,6 +411,8 @@ function Sidebar({
   onToggleDataset,
   onSelectQuestion,
   onThemeChange,
+  shortcutOpen,
+  onToggleShortcut,
   isMobileOpen,
   onClose,
 }) {
@@ -490,8 +469,49 @@ function Sidebar({
       </div>
 
       <div className="sidebar-footer">
-        <span className="footer-label">Theme</span>
-        <ThemeToggle theme={settings.theme} onChange={onThemeChange} />
+        <div className="shortcut-toggle">
+          <button type="button" className="shortcut-btn" onClick={onToggleShortcut}>
+            {shortcutOpen ? SHORTCUT_LABELS.buttonClose : SHORTCUT_LABELS.buttonOpen}
+          </button>
+          {shortcutOpen ? (
+            <div className="shortcut-popover" role="dialog" aria-label={SHORTCUT_LABELS.title}>
+              <div className="shortcut-header">
+                <h2 className="shortcut-title">{SHORTCUT_LABELS.title}</h2>
+                <span className="shortcut-note">{SHORTCUT_LABELS.pcOnly}</span>
+              </div>
+              <div className="shortcut-grid">
+                <div className="shortcut-item">
+                  <kbd>1-9</kbd>
+                  <span>{SHORTCUT_LABELS.select}</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>C</kbd>
+                  <span>{SHORTCUT_LABELS.complete}</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>B</kbd>
+                  <span>{SHORTCUT_LABELS.bookmark}</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>{"\u2190 / \u2192"}</kbd>
+                  <span>{SHORTCUT_LABELS.nav}</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>{"\u2191 / \u2193"}</kbd>
+                  <span>{SHORTCUT_LABELS.nav}</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>Esc</kbd>
+                  <span>{SHORTCUT_LABELS.closeImage}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div className="theme-row">
+          <span className="footer-label">Theme</span>
+          <ThemeToggle theme={settings.theme} onChange={onThemeChange} />
+        </div>
       </div>
     </aside>
   );
@@ -509,6 +529,7 @@ function App() {
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isShortcutOpen, setIsShortcutOpen] = useState(false);
 
   const [progress, setProgress] = useStoredState(STORAGE_PROGRESS, {});
   const [storedSettings, setStoredSettings] = useStoredState(
@@ -752,10 +773,11 @@ function App() {
   function renderMain() {
     if (!selected) {
       return (
-        <div className="main-stack">
-          <EmptyState message="右のフォルダから問題を選択してください" />
-          <ShortcutPanel />
-        </div>
+        <EmptyState
+          message={
+            "\u53f3\u306e\u30d5\u30a9\u30eb\u30c0\u304b\u3089\u554f\u984c\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044"
+          }
+        />
       );
     }
 
@@ -774,27 +796,24 @@ function App() {
     const correctSet = new Set(correctIndices);
 
     return (
-      <div className="main-stack">
-        <QuestionCard
-          question={q}
-          datasetLabel={ds.label}
-          progressEntry={progressEntry}
-          selectedOptions={selectedOptions}
-          showAnswer={showAnswer}
-          correctSet={correctSet}
-          images={images}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          onToggleCompleted={toggleCompleted}
-          onToggleBookmark={toggleBookmark}
-          onToggleOption={toggleOption}
-          onCheckAnswer={() => handleCheckAnswer(q)}
-          onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
-          onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
-          onOpenImage={setLightboxSrc}
-        />
-        <ShortcutPanel />
-      </div>
+      <QuestionCard
+        question={q}
+        datasetLabel={ds.label}
+        progressEntry={progressEntry}
+        selectedOptions={selectedOptions}
+        showAnswer={showAnswer}
+        correctSet={correctSet}
+        images={images}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onToggleCompleted={toggleCompleted}
+        onToggleBookmark={toggleBookmark}
+        onToggleOption={toggleOption}
+        onCheckAnswer={() => handleCheckAnswer(q)}
+        onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
+        onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
+        onOpenImage={setLightboxSrc}
+      />
     );
   }
 
@@ -837,6 +856,8 @@ function App() {
         onThemeChange={(theme) =>
           setStoredSettings((prev) => ({ ...prev, theme }))
         }
+        shortcutOpen={isShortcutOpen}
+        onToggleShortcut={() => setIsShortcutOpen((prev) => !prev)}
         isMobileOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />

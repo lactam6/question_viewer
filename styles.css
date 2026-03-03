@@ -221,9 +221,9 @@ body {
 .sidebar-footer {
   padding: 8px 18px 14px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   border-top: 1px solid var(--border);
   margin-top: 8px;
 }
@@ -231,6 +231,107 @@ body {
 .footer-label {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+
+.shortcut-toggle {
+  position: relative;
+  display: none;
+}
+
+.shortcut-btn {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.shortcut-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.shortcut-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.shortcut-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.shortcut-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.shortcut-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.shortcut-item kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (min-width: 901px) {
+  .shortcut-toggle {
+    display: block;
+  }
 }
 
 .theme-toggle {
@@ -425,13 +526,6 @@ body {
   overflow-y: auto;
 }
 
-.main-stack {
-  max-width: 760px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
 
 .main::-webkit-scrollbar {
   width: 6px;
@@ -452,77 +546,14 @@ body {
   box-shadow: var(--shadow);
 }
 
-.main-stack .question-card {
-  margin: 0;
-  width: 100%;
-}
 
-.shortcut-panel {
-  display: none;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 20px 24px;
-  box-shadow: var(--shadow);
-}
 
-.shortcut-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
 
-.shortcut-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0;
-}
 
-.shortcut-note {
-  font-size: 12px;
-  color: var(--text-muted);
-  background: var(--panel-soft);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 999px;
-}
 
-.shortcut-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
 
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--panel-soft);
-  border: 1px solid var(--border);
-  font-size: 13px;
-  color: var(--text);
-}
 
-.shortcut-item kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
-  font-size: 12px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  white-space: nowrap;
-}
 
-@media (min-width: 901px) {
-  .shortcut-panel {
-    display: block;
-  }
-}
 
 .q-card-header {
   display: flex;
