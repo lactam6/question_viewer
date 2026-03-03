@@ -30,6 +30,7 @@ const SHORTCUT_LABELS = {
   bookmark: "\u30d6\u30c3\u30af\u30de\u30fc\u30af\u306e\u5207\u66ff",
   nav: "\u524d/\u6b21\u306e\u554f\u984c\u3078\u79fb\u52d5",
   closeImage: "\u753b\u50cf\u62e1\u5927\u3092\u9589\u3058\u308b",
+  checkToggle: "\u89e3\u7b54\u30c1\u30a7\u30c3\u30af\u3092\u30c8\u30b0\u30eb",
 };
 
 
@@ -474,35 +475,46 @@ function Sidebar({
             {shortcutOpen ? SHORTCUT_LABELS.buttonClose : SHORTCUT_LABELS.buttonOpen}
           </button>
           {shortcutOpen ? (
-            <div className="shortcut-popover" role="dialog" aria-label={SHORTCUT_LABELS.title}>
-              <div className="shortcut-header">
-                <h2 className="shortcut-title">{SHORTCUT_LABELS.title}</h2>
-                <span className="shortcut-note">{SHORTCUT_LABELS.pcOnly}</span>
-              </div>
-              <div className="shortcut-grid">
-                <div className="shortcut-item">
-                  <kbd>1-9</kbd>
-                  <span>{SHORTCUT_LABELS.select}</span>
+            <div className="shortcut-overlay" onClick={onToggleShortcut}>
+              <div
+                className="shortcut-modal"
+                role="dialog"
+                aria-label={SHORTCUT_LABELS.title}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="shortcut-header">
+                  <h2 className="shortcut-title">{SHORTCUT_LABELS.title}</h2>
+                  <span className="shortcut-note">{SHORTCUT_LABELS.pcOnly}</span>
                 </div>
-                <div className="shortcut-item">
-                  <kbd>C</kbd>
-                  <span>{SHORTCUT_LABELS.complete}</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>B</kbd>
-                  <span>{SHORTCUT_LABELS.bookmark}</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>{"\u2190 / \u2192"}</kbd>
-                  <span>{SHORTCUT_LABELS.nav}</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>{"\u2191 / \u2193"}</kbd>
-                  <span>{SHORTCUT_LABELS.nav}</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Esc</kbd>
-                  <span>{SHORTCUT_LABELS.closeImage}</span>
+                <div className="shortcut-grid">
+                  <div className="shortcut-item">
+                    <kbd>1-9</kbd>
+                    <span>{SHORTCUT_LABELS.select}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>C</kbd>
+                    <span>{SHORTCUT_LABELS.complete}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>B</kbd>
+                    <span>{SHORTCUT_LABELS.bookmark}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>{"\u2190 / \u2192"}</kbd>
+                    <span>{SHORTCUT_LABELS.nav}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>{"\u2191 / \u2193"}</kbd>
+                    <span>{SHORTCUT_LABELS.nav}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Esc</kbd>
+                    <span>{SHORTCUT_LABELS.closeImage}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Space</kbd>
+                    <span>{SHORTCUT_LABELS.checkToggle}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -686,6 +698,14 @@ function App() {
         return;
       }
 
+      if (event.code === "Space" || event.key === " ") {
+        if (question) {
+          event.preventDefault();
+          handleCheckAnswer(question);
+        }
+        return;
+      }
+
       if (event.key === "ArrowDown" || event.key === "ArrowRight") {
         event.preventDefault();
         if (index < filtered.length - 1) {
@@ -699,6 +719,10 @@ function App() {
           setCollapsedMap((prev) => ({ ...prev, [ds.key]: false }));
         }
       } else if (event.key === "Escape") {
+        if (shortcutOpen) {
+          setIsShortcutOpen(false);
+          return;
+        }
         setLightboxSrc("");
       }
     }

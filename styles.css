@@ -256,17 +256,25 @@ body {
   color: var(--text-strong);
 }
 
-.shortcut-popover {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 10px);
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 16, 0.55);
+  z-index: 50;
+}
+
+.shortcut-modal {
+  width: min(560px, 92vw);
+  max-height: min(80vh, 640px);
+  overflow: auto;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 18px;
+  padding: 18px 20px;
   box-shadow: var(--shadow);
-  z-index: 20;
 }
 
 .shortcut-header {
