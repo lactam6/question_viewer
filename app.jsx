@@ -708,7 +708,7 @@ function App() {
 
   function renderMain() {
     if (!selected) {
-      return <EmptyState message="左のフォルダから問題を選択してください" />;
+      return <EmptyState message="右のフォルダから問題を選択してください" />;
     }
 
     const ds = datasets.find((d) => d.key === selected.datasetKey);
