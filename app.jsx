@@ -396,15 +396,20 @@ function Sidebar({
   onToggleDataset,
   onSelectQuestion,
   onThemeChange,
+  isMobileOpen,
+  onClose,
 }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isMobileOpen ? "open" : ""}`}>
       <div className="sidebar-header">
         <div className="title-block">
           <p className="eyebrow">Question Viewer</p>
           <h1>問題演習ビューアー</h1>
         </div>
         <div className="count">{statusText}</div>
+        <button type="button" className="sidebar-close" onClick={onClose}>
+          ✕
+        </button>
       </div>
 
       <StatusTabs value={statusFilter} onChange={onStatusFilterChange} />
@@ -465,6 +470,7 @@ function App() {
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [progress, setProgress] = useStoredState(STORAGE_PROGRESS, {});
   const [storedSettings, setStoredSettings] = useStoredState(
@@ -480,6 +486,10 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
+
+  useEffect(() => {
+    document.body.classList.toggle("sidebar-open", isSidebarOpen);
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     let active = true;
@@ -689,6 +699,7 @@ function App() {
   function handleSelect(datasetKey, questionId) {
     setSelected({ datasetKey, questionId });
     setCollapsedMap((prev) => ({ ...prev, [datasetKey]: false }));
+    setIsSidebarOpen(false);
   }
 
   function handleToggleDataset(key) {
@@ -738,6 +749,22 @@ function App() {
 
   return (
     <div className="app">
+      <header className="mobile-header">
+        <div className="mobile-title">問題演習ビューアー</div>
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setIsSidebarOpen(true)}
+        >
+          ☰
+        </button>
+      </header>
+
+      <div
+        className={`sidebar-overlay ${isSidebarOpen ? "show" : ""}`}
+        onClick={() => setIsSidebarOpen(false)}
+      ></div>
+
       <Sidebar
         statusText={statusText}
         statusFilter={statusFilter}
@@ -759,6 +786,8 @@ function App() {
         onThemeChange={(theme) =>
           setStoredSettings((prev) => ({ ...prev, theme }))
         }
+        isMobileOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       <main className="main">{renderMain()}</main>
