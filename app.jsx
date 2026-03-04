@@ -100,6 +100,27 @@ function normalizeOptions(rawOptions) {
 }
 
 async function listJsonFiles() {
+  const manifestCandidates = ["./data/manifest.json", "./application/data/manifest.json"];
+  let manifestRes = null;
+  for (const path of manifestCandidates) {
+    try {
+      const res = await fetch(path, { cache: "no-store" });
+      if (res.ok) {
+        manifestRes = res;
+        break;
+      }
+    } catch (err) {
+      // continue
+    }
+  }
+
+  if (manifestRes) {
+    const manifest = await manifestRes.json();
+    if (Array.isArray(manifest)) return manifest;
+    if (Array.isArray(manifest.files)) return manifest.files;
+    throw new Error("manifest.json has an unexpected shape.");
+  }
+
   try {
     const res = await fetch("./data/");
     if (res.ok) {
@@ -118,30 +139,9 @@ async function listJsonFiles() {
     // ignore and fallback
   }
 
-  const manifestCandidates = ["./data/manifest.json", "./application/data/manifest.json"];
-  let manifestRes = null;
-  for (const path of manifestCandidates) {
-    try {
-      const res = await fetch(path, { cache: "no-store" });
-      if (res.ok) {
-        manifestRes = res;
-        break;
-      }
-    } catch (err) {
-      // continue
-    }
-  }
-
-  if (!manifestRes) {
-    throw new Error(
-      "dataフォルダ内のJSON一覧を取得できませんでした。manifest.json が公開されているか確認してください。"
-    );
-  }
-
-  const manifest = await manifestRes.json();
-  if (Array.isArray(manifest)) return manifest;
-  if (Array.isArray(manifest.files)) return manifest.files;
-  throw new Error("manifest.jsonの形式が不正です。");
+  throw new Error(
+    "No JSON files found under /data. Add data/manifest.json or enable directory listing."
+  );
 }
 
 function buildQuestion(q, index, file) {
