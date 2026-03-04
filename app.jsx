@@ -33,6 +33,9 @@ const SHORTCUT_LABELS = {
   checkToggle: "\u89e3\u7b54\u30c1\u30a7\u30c3\u30af\u3092\u30c8\u30b0\u30eb",
 };
 
+const DESCRIPTIVE_TAG_KEY = "writing";
+const DESCRIPTIVE_TAG_LABEL = "\u8a18\u8ff0";
+
 
 function loadStoredJson(key, fallback) {
   try {
@@ -61,6 +64,9 @@ function useStoredState(key, fallback) {
 }
 
 function normalizeImages(images) {
+  if (typeof images === "string") {
+    images = [images];
+  }
   if (!Array.isArray(images)) return [];
   return images
     .filter((img) => typeof img === "string" && img.trim().length > 0)
@@ -69,6 +75,28 @@ function normalizeImages(images) {
 
 function normalizeText(value) {
   return (value ?? "").toString().replace(/\s+/g, " ").trim();
+}
+
+function normalizeOptions(rawOptions) {
+  if (Array.isArray(rawOptions)) {
+    const allEmpty =
+      rawOptions.length === 0 ||
+      rawOptions.every((opt) => normalizeText(opt) === "");
+    if (allEmpty) return { options: [], optionKeys: null };
+    return { options: rawOptions, optionKeys: null };
+  }
+  if (rawOptions && typeof rawOptions === "object") {
+    const entries = Object.entries(rawOptions);
+    const values = entries.map(([, value]) => value);
+    const allEmpty =
+      values.length === 0 || values.every((opt) => normalizeText(opt) === "");
+    if (allEmpty) return { options: [], optionKeys: null };
+    return {
+      options: values,
+      optionKeys: entries.map(([key]) => key),
+    };
+  }
+  return { options: [], optionKeys: null };
 }
 
 async function listJsonFiles() {
@@ -81,7 +109,9 @@ async function listJsonFiles() {
         .map((a) => a.getAttribute("href"))
         .filter((href) => href && href.endsWith(".json"))
         .map((href) => href.split("/").pop());
-      const unique = Array.from(new Set(files));
+      const unique = Array.from(new Set(files)).filter(
+        (name) => name && name.toLowerCase() !== "manifest.json"
+      );
       if (unique.length > 0) return unique;
     }
   } catch (err) {
@@ -116,10 +146,13 @@ async function listJsonFiles() {
 
 function buildQuestion(q, index, file) {
   const id = q.id ?? `${file}__${index + 1}`;
+  const { options, optionKeys } = normalizeOptions(q.options);
   return {
     ...q,
     id,
     category: file,
+    options,
+    _optionKeys: optionKeys,
     _index: index + 1,
     _rawIndex: index,
   };
@@ -128,7 +161,8 @@ function buildQuestion(q, index, file) {
 function filterQuestions(questions, keyword, statusFilter, progressById) {
   const needle = keyword.trim().toLowerCase();
   return questions.filter((q) => {
-    const text = `${q.question ?? ""} ${(q.options ?? []).join(" ")}`.toLowerCase();
+    const optionText = Array.isArray(q.options) ? q.options.join(" ") : "";
+    const text = `${q.question ?? ""} ${optionText}`.toLowerCase();
     const matches = !needle || text.includes(needle);
     if (!matches) return false;
 
@@ -154,11 +188,28 @@ function evaluateSelection(question, selected) {
     : question.answer
     ? [question.answer]
     : [];
-  const answerSet = new Set(answers.map((a) => normalizeText(a)));
   const options = Array.isArray(question.options) ? question.options : [];
-  const correctIndices = options
-    .map((opt, idx) => (answerSet.has(normalizeText(opt)) ? idx : -1))
-    .filter((idx) => idx >= 0);
+  const optionKeys = Array.isArray(question._optionKeys) ? question._optionKeys : null;
+
+  let correctIndices = [];
+  if (optionKeys && answers.length) {
+    const keyMap = new Map(
+      optionKeys.map((key, idx) => [normalizeText(key), idx])
+    );
+    const fromKeys = answers
+      .map((a) => keyMap.get(normalizeText(a)))
+      .filter((idx) => typeof idx === "number");
+    if (fromKeys.length) {
+      correctIndices = Array.from(new Set(fromKeys));
+    }
+  }
+
+  if (!correctIndices.length) {
+    const answerSet = new Set(answers.map((a) => normalizeText(a)));
+    correctIndices = options
+      .map((opt, idx) => (answerSet.has(normalizeText(opt)) ? idx : -1))
+      .filter((idx) => idx >= 0);
+  }
 
   const selectedSet = new Set(selected);
   const correctSet = new Set(correctIndices);
@@ -204,13 +255,21 @@ function ThemeToggle({ theme, onChange }) {
   );
 }
 
-function OptionList({ options, selectedOptions, correctSet, showAnswer, onToggle }) {
+function OptionList({
+  options,
+  optionKeys,
+  selectedOptions,
+  correctSet,
+  showAnswer,
+  onToggle,
+}) {
   return (
     <div className="options-list">
       {options.map((opt, i) => {
         const isSelected = selectedOptions.includes(i);
         const isCorrect = showAnswer && correctSet.has(i);
         const isIncorrect = showAnswer && isSelected && !correctSet.has(i);
+        const label = optionKeys?.[i] ?? i + 1;
         return (
           <button
             key={`opt-${i}`}
@@ -220,7 +279,7 @@ function OptionList({ options, selectedOptions, correctSet, showAnswer, onToggle
             } ${isIncorrect ? "incorrect" : ""}`}
             onClick={() => onToggle(i)}
           >
-            <span className="option-num">{i + 1}</span>
+            <span className="option-num">{label}</span>
             <span className="option-text">{opt}</span>
           </button>
         );
@@ -237,6 +296,7 @@ function QuestionCard({
   showAnswer,
   correctSet,
   images,
+  explanationImages,
   hasPrev,
   hasNext,
   onToggleCompleted,
@@ -287,13 +347,16 @@ function QuestionCard({
           ))}
         </div>
       ) : null}
-      <OptionList
-        options={question.options ?? []}
-        selectedOptions={selectedOptions}
-        correctSet={correctSet}
-        showAnswer={showAnswer}
-        onToggle={onToggleOption}
-      />
+      {Array.isArray(question.options) && question.options.length ? (
+        <OptionList
+          options={question.options}
+          optionKeys={question._optionKeys}
+          selectedOptions={selectedOptions}
+          correctSet={correctSet}
+          showAnswer={showAnswer}
+          onToggle={onToggleOption}
+        />
+      ) : null}
       <div className="answer-actions">
         <button type="button" className="check-btn" onClick={onCheckAnswer}>
           解答チェック
@@ -311,6 +374,22 @@ function QuestionCard({
         <div className="explanation">
           <div className="explanation-title">解説</div>
           <div className="explanation-body">{question.explanation ?? "解説はありません。"}</div>
+
+          {explanationImages.length ? (
+            <div className="q-images">
+              {explanationImages.map((src, i) => (
+                <img
+                  key={`${question.id ?? question._index}-exp-${i}`}
+                  src={src}
+                  alt="Explanation image"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenImage(src);
+                  }}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -372,6 +451,12 @@ function DatasetItem({
             const entry = getProgressEntry({ [dataset.key]: progressEntries }, dataset.key, q.id);
             const hasImages =
               Array.isArray(q.question_images) && q.question_images.length > 0;
+            const hasDescriptiveTag =
+              Array.isArray(q.tags) && q.tags.includes(DESCRIPTIVE_TAG_KEY);
+            const isDescriptive =
+              hasDescriptiveTag ||
+              !Array.isArray(q.options) ||
+              q.options.length === 0;
             return (
               <button
                 key={`${dataset.key}-${q.id}`}
@@ -385,6 +470,9 @@ function DatasetItem({
                 </span>
                 {entry.isBookmarked ? <span className="q-tag">復習</span> : null}
                 {entry.status === "completed" ? <span className="q-tag done">完了</span> : null}
+                  {isDescriptive ? (
+                  <span className="q-tag">{DESCRIPTIVE_TAG_LABEL}</span>
+                ) : null}
                 {hasImages ? <span className="q-img-badge">{q.question_images.length}</span> : null}
               </button>
             );
@@ -448,27 +536,28 @@ function Sidebar({
             checked={settings.autoComplete}
             onChange={(event) => onSettingsChange({ autoComplete: event.target.checked })}
           />
-          <span>正解で自動完了</span>
+          <span>{"\u6b63\u89e3\u3067\u81ea\u52d5\u5b8c\u4e86"}</span>
         </label>
       </div>
 
-      {banner ? <div className="status-banner">{banner}</div> : null}
+      <div className="sidebar-scroll">
+        {banner ? <div className="status-banner">{banner}</div> : null}
 
-      <div className="dataset-list">
-        {datasets.map((ds) => (
-          <DatasetItem
-            key={ds.key}
-            dataset={ds}
-            filtered={filteredMap[ds.key] ?? []}
-            collapsed={collapsedMap[ds.key] ?? true}
-            progressEntries={progressByDataset[ds.key] || {}}
-            selected={selected}
-            onToggle={() => onToggleDataset(ds.key)}
-            onSelect={onSelectQuestion}
-          />
-        ))}
+        <div className="dataset-list">
+          {datasets.map((ds) => (
+            <DatasetItem
+              key={ds.key}
+              dataset={ds}
+              filtered={filteredMap[ds.key] ?? []}
+              collapsed={collapsedMap[ds.key] ?? true}
+              progressEntries={progressByDataset[ds.key] || {}}
+              selected={selected}
+              onToggle={() => onToggleDataset(ds.key)}
+              onSelect={onSelectQuestion}
+            />
+          ))}
+        </div>
       </div>
-
       <div className="sidebar-footer">
         <div className="shortcut-toggle">
           <button type="button" className="shortcut-btn" onClick={onToggleShortcut}>
@@ -811,8 +900,10 @@ function App() {
     const index = filtered.findIndex((q) => q.id === selected.questionId);
     const q = filtered[index];
     if (!q) return null;
-
     const images = normalizeImages(q.question_images);
+    const explanationImages = normalizeImages(
+      q.explanation_images ?? q.explanation_image ?? q.explanationImages ?? q.explanationImage
+    );
     const hasPrev = index > 0;
     const hasNext = index < filtered.length - 1;
     const progressEntry = getProgressEntry(progress, ds.key, q.id);
@@ -828,6 +919,7 @@ function App() {
         showAnswer={showAnswer}
         correctSet={correctSet}
         images={images}
+        explanationImages={explanationImages}
         hasPrev={hasPrev}
         hasNext={hasNext}
         onToggleCompleted={toggleCompleted}
