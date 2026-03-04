@@ -1,5 +1,5 @@
 ﻿[
-  "questions_kakomon.json",
-  "questions_smalltest_merged.json",
-  "bacteriology_text.json"
+  { "file": "questions_kakomon.json", "label": "寄生虫学過去問.json" },
+  { "file": "questions_smalltest_merged.json", "label": "寄生虫学小テスト.json" },
+  { "file": "bacteriology_text.json", "label": "細菌感染シケタイ.json" }
 ]

@@ -6,7 +6,7 @@
 - 可能なら `data/` の `*.json` を自動検出。
 - 自動検出に失敗した場合は `manifest.json` を参照。
 
-`manifest.json` は以下のどちらかの形式に対応しています。
+`manifest.json` は以下のいずれかの形式に対応しています。
 
 ```json
 ["questions.json", "questions_smalltest.json"]
@@ -15,6 +15,16 @@
 ```json
 { "files": ["questions.json", "questions_smalltest.json"] }
 ```
+
+```json
+[
+  { "file": "questions.json", "label": "過去問" },
+  { "file": "questions_smalltest.json", "label": "小テストまとめ" }
+]
+```
+
+- `file` は読み込む JSON ファイル名。
+- `label` は画面に表示する名称（省略時は `file` を使用）。
 
 ## 各JSONファイルの形式
 - 1ファイル = 問題オブジェクト配列。
@@ -25,7 +35,6 @@
 
 #### id
 - 型: string（uuid）
-- 未指定時は `"{ファイル名}__{連番}"` が自動生成されます。
 
 #### tags
 - 型: string の配列（任意）

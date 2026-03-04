@@ -100,6 +100,25 @@ function normalizeOptions(rawOptions) {
 }
 
 async function listJsonFiles() {
+  function normalizeEntries(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((item) => {
+        if (typeof item === "string") {
+          const name = item.trim();
+          return name ? { file: name, label: name } : null;
+        }
+        if (item && typeof item === "object") {
+          const file = typeof item.file === "string" ? item.file.trim() : "";
+          const labelRaw = typeof item.label === "string" ? item.label.trim() : "";
+          if (!file) return null;
+          return { file, label: labelRaw || file };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
   const manifestCandidates = ["./data/manifest.json", "./application/data/manifest.json"];
   let manifestRes = null;
   for (const path of manifestCandidates) {
@@ -116,9 +135,15 @@ async function listJsonFiles() {
 
   if (manifestRes) {
     const manifest = await manifestRes.json();
-    if (Array.isArray(manifest)) return manifest;
-    if (Array.isArray(manifest.files)) return manifest.files;
-    throw new Error("manifest.json has an unexpected shape.");
+    const rawList = Array.isArray(manifest)
+      ? manifest
+      : Array.isArray(manifest?.files)
+      ? manifest.files
+      : null;
+    if (!rawList) throw new Error("manifest.json has an unexpected shape.");
+    const entries = normalizeEntries(rawList);
+    if (entries.length) return entries;
+    throw new Error("manifest.json contains no valid entries.");
   }
 
   try {
@@ -133,7 +158,7 @@ async function listJsonFiles() {
       const unique = Array.from(new Set(files)).filter(
         (name) => name && name.toLowerCase() !== "manifest.json"
       );
-      if (unique.length > 0) return unique;
+      if (unique.length > 0) return normalizeEntries(unique);
     }
   } catch (err) {
     // ignore and fallback
@@ -655,9 +680,9 @@ function App() {
     let active = true;
     async function load() {
       setStatusText("JSONファイルを探しています...");
-      let files;
+      let entries;
       try {
-        files = await listJsonFiles();
+        entries = await listJsonFiles();
       } catch (err) {
         if (!active) return;
         setBanner(err.message);
@@ -665,7 +690,7 @@ function App() {
         return;
       }
 
-      if (!files.length) {
+      if (!entries.length) {
         if (!active) return;
         setBanner("dataフォルダにJSONファイルがありません。");
         setStatusText("dataフォルダにJSONがありません");
@@ -674,14 +699,16 @@ function App() {
 
       const loaded = [];
       const warnings = [];
-      for (const file of files) {
+      for (const entry of entries) {
+        const file = entry.file;
+        const label = entry.label || entry.file;
         try {
           const res = await fetch(`./data/${file}`);
           if (!res.ok) throw new Error(`${file} の読み込みに失敗しました`);
           const data = await res.json();
           if (!Array.isArray(data)) throw new Error(`${file} は配列形式ではありません`);
           const questions = data.map((q, index) => buildQuestion(q, index, file));
-          loaded.push({ key: file, label: file, questions });
+          loaded.push({ key: file, label, questions });
         } catch (err) {
           warnings.push(err.message);
         }
