@@ -1191,6 +1191,7 @@ function App() {
           activeElement.tagName === "SELECT" ||
           activeElement.isContentEditable);
 
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isNoteFocused) return;
       if (isTypingTarget) return;
       if (!selected) return;
