@@ -1,10 +1,12 @@
-const { useEffect, useMemo, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_PROGRESS = "questionViewerProgress";
 const STORAGE_SETTINGS = "questionViewerSettings";
+const STORAGE_NOTES = "questionViewerNotes";
 
 const DEFAULT_SETTINGS = {
   autoComplete: true,
+  noteEnabled: false,
   theme: "light",
 };
 
@@ -31,6 +33,7 @@ const SHORTCUT_LABELS = {
   nav: "\u524d/\u6b21\u306e\u554f\u984c\u3078\u79fb\u52d5",
   closeImage: "\u753b\u50cf\u62e1\u5927\u3092\u9589\u3058\u308b",
   checkToggle: "\u89e3\u7b54\u30c1\u30a7\u30c3\u30af\u3092\u30c8\u30b0\u30eb",
+  noteFocus: "\u30ce\u30fc\u30c8\u3078\u30d5\u30a9\u30fc\u30ab\u30b9/\u89e3\u9664",
 };
 
 const DESCRIPTIVE_TAG_KEY = "writing";
@@ -280,6 +283,73 @@ function ThemeToggle({ theme, onChange }) {
   );
 }
 
+function NotePane({ value, onChange, onClear, inputRef }) {
+  const gutterRef = useRef(null);
+  const textareaRef = useRef(null);
+  const actualLineCount = (value.match(/\n/g)?.length ?? 0) + 1;
+  const lineNumbers = useMemo(
+    () => Array.from({ length: Math.max(1, actualLineCount) }, (_, index) => index + 1),
+    [actualLineCount]
+  );
+
+  useEffect(() => {
+    if (!textareaRef.current || !gutterRef.current) return;
+    if (!value) {
+      textareaRef.current.scrollTop = 0;
+    }
+    gutterRef.current.style.transform = `translateY(-${textareaRef.current.scrollTop}px)`;
+  }, [value]);
+
+  function handleScroll(event) {
+    if (gutterRef.current) {
+      gutterRef.current.style.transform = `translateY(-${event.target.scrollTop}px)`;
+    }
+  }
+
+  function setTextareaRef(node) {
+    textareaRef.current = node;
+    if (!inputRef) return;
+    inputRef.current = node;
+  }
+
+  return (
+    <aside className="note-pane" aria-label="ノート">
+      <div className="note-header">
+        <div className="note-title">ノート</div>
+        <button
+          type="button"
+          className="note-clear-btn"
+          onClick={onClear}
+          disabled={!value}
+        >
+          ノートをクリア
+        </button>
+      </div>
+      <div className="note-editor">
+        <div className="note-gutter" aria-hidden="true">
+          <div ref={gutterRef} className="note-line-numbers">
+            {lineNumbers.map((line) => (
+              <div key={line} className="note-line-number">
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+        <textarea
+          ref={setTextareaRef}
+          className="note-textarea"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onScroll={handleScroll}
+          spellCheck={false}
+          wrap="off"
+          placeholder="ここにメモを書けます"
+        />
+      </div>
+    </aside>
+  );
+}
+
 function OptionList({
   options,
   optionKeys,
@@ -322,19 +392,26 @@ function QuestionCard({
   correctSet,
   images,
   explanationImages,
+  noteEnabled,
+  noteValue,
+  noteInputRef,
   hasPrev,
   hasNext,
   onToggleCompleted,
   onToggleBookmark,
   onToggleOption,
   onCheckAnswer,
+  onNoteChange,
+  onClearNote,
   onPrev,
   onNext,
   onOpenImage,
 }) {
   return (
     <div className="question-card">
-      <div className="q-card-header">
+      <div className={`question-layout ${noteEnabled ? "with-note" : "without-note"}`}>
+        <div className="question-content">
+          <div className="q-card-header">
         <button
           type="button"
           className={`status-toggle ${progressEntry.status === "completed" ? "completed" : ""}`}
@@ -382,7 +459,17 @@ function QuestionCard({
           onToggle={onToggleOption}
         />
       ) : null}
-      <div className="answer-actions">
+        </div>
+        {noteEnabled ? (
+          <NotePane
+            value={noteValue}
+            onChange={onNoteChange}
+            onClear={onClearNote}
+            inputRef={noteInputRef}
+          />
+        ) : null}
+        <div className="question-footer">
+          <div className="answer-actions">
         <button type="button" className="check-btn" onClick={onCheckAnswer}>
           解答チェック
         </button>
@@ -417,6 +504,8 @@ function QuestionCard({
           ) : null}
         </div>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -563,6 +652,14 @@ function Sidebar({
           />
           <span>{"\u6b63\u89e3\u3067\u81ea\u52d5\u5b8c\u4e86"}</span>
         </label>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={settings.noteEnabled}
+            onChange={(event) => onSettingsChange({ noteEnabled: event.target.checked })}
+          />
+          <span>ノート機能</span>
+        </label>
       </div>
 
       <div className="sidebar-scroll">
@@ -629,6 +726,10 @@ function Sidebar({
                     <kbd>Space</kbd>
                     <span>{SHORTCUT_LABELS.checkToggle}</span>
                   </div>
+                  <div className="shortcut-item">
+                    <kbd>Alt + N</kbd>
+                    <span>{SHORTCUT_LABELS.noteFocus}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -656,12 +757,14 @@ function App() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isShortcutOpen, setIsShortcutOpen] = useState(false);
+  const noteInputRef = useRef(null);
 
   const [progress, setProgress] = useStoredState(STORAGE_PROGRESS, {});
   const [storedSettings, setStoredSettings] = useStoredState(
     STORAGE_SETTINGS,
     DEFAULT_SETTINGS
   );
+  const [notes, setNotes] = useStoredState(STORAGE_NOTES, {});
 
   const settings = useMemo(
     () => ({ ...DEFAULT_SETTINGS, ...storedSettings }),
@@ -784,7 +887,30 @@ function App() {
 
   useEffect(() => {
     function handleKey(event) {
-      if (event.target && event.target.tagName === "INPUT") return;
+      const activeElement = document.activeElement;
+      const isNoteFocused = noteInputRef.current && activeElement === noteInputRef.current;
+
+      if (event.altKey && (event.key === "n" || event.key === "N")) {
+        if (settings.noteEnabled && selected && noteInputRef.current) {
+          event.preventDefault();
+          if (isNoteFocused) {
+            noteInputRef.current.blur();
+          } else {
+            noteInputRef.current.focus();
+          }
+        }
+        return;
+      }
+
+      const isTypingTarget =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.tagName === "SELECT" ||
+          activeElement.isContentEditable);
+
+      if (isNoteFocused) return;
+      if (isTypingTarget) return;
       if (!selected) return;
 
       const ds = datasets.find((d) => d.key === selected.datasetKey);
@@ -835,7 +961,7 @@ function App() {
           setCollapsedMap((prev) => ({ ...prev, [ds.key]: false }));
         }
       } else if (event.key === "Escape") {
-        if (shortcutOpen) {
+        if (isShortcutOpen) {
           setIsShortcutOpen(false);
           return;
         }
@@ -845,7 +971,7 @@ function App() {
 
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [datasets, filteredMap, selected, selectedOptions]);
+  }, [datasets, filteredMap, selected, selectedOptions, settings.noteEnabled, isShortcutOpen]);
 
   function updateProgress(datasetKey, questionId, updates) {
     setProgress((prev) => {
@@ -910,6 +1036,27 @@ function App() {
     setCollapsedMap((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
+  function updateNote(datasetKey, questionId, value) {
+    setNotes((prev) => {
+      const next = { ...prev };
+      const datasetNotes = { ...(prev[datasetKey] || {}) };
+
+      if (value) {
+        datasetNotes[questionId] = value;
+      } else {
+        delete datasetNotes[questionId];
+      }
+
+      if (Object.keys(datasetNotes).length > 0) {
+        next[datasetKey] = datasetNotes;
+      } else {
+        delete next[datasetKey];
+      }
+
+      return next;
+    });
+  }
+
   function renderMain() {
     if (!selected) {
       return (
@@ -936,6 +1083,7 @@ function App() {
     const progressEntry = getProgressEntry(progress, ds.key, q.id);
     const { correctIndices } = evaluateSelection(q, selectedOptions);
     const correctSet = new Set(correctIndices);
+    const noteValue = notes?.[ds.key]?.[q.id] ?? "";
 
     return (
       <QuestionCard
@@ -947,12 +1095,17 @@ function App() {
         correctSet={correctSet}
         images={images}
         explanationImages={explanationImages}
+        noteEnabled={settings.noteEnabled}
+        noteValue={noteValue}
+        noteInputRef={noteInputRef}
         hasPrev={hasPrev}
         hasNext={hasNext}
         onToggleCompleted={toggleCompleted}
         onToggleBookmark={toggleBookmark}
         onToggleOption={toggleOption}
         onCheckAnswer={() => handleCheckAnswer(q)}
+        onNoteChange={(value) => updateNote(ds.key, q.id, value)}
+        onClearNote={() => updateNote(ds.key, q.id, "")}
         onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
         onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
         onOpenImage={setLightboxSrc}
