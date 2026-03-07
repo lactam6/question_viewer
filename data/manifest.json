@@ -1,6 +1,4 @@
 ﻿[
-  { "file": "questions_kakomon.json", "label": "寄生虫学過去問.json" },
-  { "file": "questions_smalltest_merged.json", "label": "寄生虫学小テスト.json" },
   { "file": "bacteriology_text.json", "label": "細菌感染シケタイ.json" },
   { "file": "immunology.json", "label": "免疫学小テスト.json" },
   { "file": "virology-writing.json", "label": "ウイルス学記述.json" }
