@@ -1,4 +1,4 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useLayoutEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_PROGRESS = "questionViewerProgress";
 const STORAGE_SETTINGS = "questionViewerSettings";
@@ -7,6 +7,7 @@ const STORAGE_NOTES = "questionViewerNotes";
 const DEFAULT_SETTINGS = {
   autoComplete: true,
   noteEnabled: false,
+  noteWrap: false,
   theme: "light",
 };
 
@@ -283,13 +284,17 @@ function ThemeToggle({ theme, onChange }) {
   );
 }
 
-function NotePane({ value, onChange, onClear, inputRef }) {
+function NotePane({ value, onChange, onClear, inputRef, wrapEnabled, onWrapChange }) {
   const gutterRef = useRef(null);
   const textareaRef = useRef(null);
-  const actualLineCount = (value.match(/\n/g)?.length ?? 0) + 1;
-  const lineNumbers = useMemo(
-    () => Array.from({ length: Math.max(1, actualLineCount) }, (_, index) => index + 1),
-    [actualLineCount]
+  const mirrorRef = useRef(null);
+  const logicalLines = useMemo(() => value.split("\n"), [value]);
+  const [mirrorWidth, setMirrorWidth] = useState(0);
+  const [lineNumbers, setLineNumbers] = useState(["1"]);
+  const [isCompactNote, setIsCompactNote] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 1024px)").matches
+      : false
   );
 
   useEffect(() => {
@@ -299,6 +304,88 @@ function NotePane({ value, onChange, onClear, inputRef }) {
     }
     gutterRef.current.style.transform = `translateY(-${textareaRef.current.scrollTop}px)`;
   }, [value]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    const updateCompactNote = (event) => setIsCompactNote(event.matches);
+
+    setIsCompactNote(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateCompactNote);
+      return () => mediaQuery.removeEventListener("change", updateCompactNote);
+    }
+
+    mediaQuery.addListener(updateCompactNote);
+    return () => mediaQuery.removeListener(updateCompactNote);
+  }, []);
+
+  useEffect(() => {
+    if (!textareaRef.current) return;
+
+    function updateMirrorWidth() {
+      if (textareaRef.current) {
+        setMirrorWidth(textareaRef.current.clientWidth);
+      }
+    }
+
+    updateMirrorWidth();
+
+    if (typeof ResizeObserver !== "function") return undefined;
+    const observer = new ResizeObserver(updateMirrorWidth);
+    observer.observe(textareaRef.current);
+    return () => observer.disconnect();
+  }, [wrapEnabled]);
+
+  useLayoutEffect(() => {
+    if (!wrapEnabled) {
+      setLineNumbers(logicalLines.map((_, index) => `${index + 1}`));
+      return;
+    }
+
+    if (!textareaRef.current || !mirrorRef.current || mirrorWidth <= 0) return;
+
+    const computed = window.getComputedStyle(textareaRef.current);
+    const lineHeight = parseFloat(computed.lineHeight) || 28.8;
+    const nextLineNumbers = [];
+    const lineNodes = mirrorRef.current.querySelectorAll(".note-mirror-line");
+
+    lineNodes.forEach((node, index) => {
+      const rect = node.getBoundingClientRect();
+      const visualRows = Math.max(1, Math.round(rect.height / lineHeight));
+      nextLineNumbers.push(`${index + 1}`);
+      for (let row = 1; row < visualRows; row += 1) {
+        nextLineNumbers.push("");
+      }
+    });
+
+    setLineNumbers(nextLineNumbers.length ? nextLineNumbers : ["1"]);
+  }, [logicalLines, mirrorWidth, wrapEnabled]);
+
+  useLayoutEffect(() => {
+    if (!textareaRef.current) return;
+
+    if (!isCompactNote) {
+      textareaRef.current.style.height = "";
+      return;
+    }
+
+    const computed = window.getComputedStyle(textareaRef.current);
+    const lineHeight = parseFloat(computed.lineHeight) || 28.8;
+    const paddingTop = parseFloat(computed.paddingTop) || 0;
+    const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+    const minHeight = lineHeight * 10 + paddingTop + paddingBottom;
+
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = `${Math.max(
+      minHeight,
+      textareaRef.current.scrollHeight
+    )}px`;
+  }, [isCompactNote, value, wrapEnabled, lineNumbers]);
 
   function handleScroll(event) {
     if (gutterRef.current) {
@@ -316,6 +403,15 @@ function NotePane({ value, onChange, onClear, inputRef }) {
     <aside className="note-pane" aria-label="ノート">
       <div className="note-header">
         <div className="note-title">ノート</div>
+        <div className="note-actions">
+          <label className="note-wrap-toggle">
+            <input
+              type="checkbox"
+              checked={wrapEnabled}
+              onChange={(event) => onWrapChange(event.target.checked)}
+            />
+            <span>折り返し</span>
+          </label>
         <button
           type="button"
           className="note-clear-btn"
@@ -324,12 +420,13 @@ function NotePane({ value, onChange, onClear, inputRef }) {
         >
           ノートをクリア
         </button>
+        </div>
       </div>
       <div className="note-editor">
         <div className="note-gutter" aria-hidden="true">
           <div ref={gutterRef} className="note-line-numbers">
-            {lineNumbers.map((line) => (
-              <div key={line} className="note-line-number">
+            {lineNumbers.map((line, index) => (
+              <div key={`${index}-${line}`} className="note-line-number">
                 {line}
               </div>
             ))}
@@ -337,14 +434,26 @@ function NotePane({ value, onChange, onClear, inputRef }) {
         </div>
         <textarea
           ref={setTextareaRef}
-          className="note-textarea"
+          className={`note-textarea ${wrapEnabled ? "wrapped" : ""}`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onScroll={handleScroll}
           spellCheck={false}
-          wrap="off"
+          wrap={wrapEnabled ? "soft" : "off"}
           placeholder="ここにメモを書けます"
         />
+        <div
+          ref={mirrorRef}
+          className={`note-mirror ${wrapEnabled ? "wrapped" : ""}`}
+          style={{ width: mirrorWidth ? `${mirrorWidth}px` : undefined }}
+          aria-hidden="true"
+        >
+          {logicalLines.map((line, index) => (
+            <div key={`mirror-${index}`} className="note-mirror-line">
+              {line || "\u200b"}
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   );
@@ -394,6 +503,7 @@ function QuestionCard({
   explanationImages,
   noteEnabled,
   noteValue,
+  noteWrap,
   noteInputRef,
   hasPrev,
   hasNext,
@@ -403,6 +513,7 @@ function QuestionCard({
   onCheckAnswer,
   onNoteChange,
   onClearNote,
+  onNoteWrapChange,
   onPrev,
   onNext,
   onOpenImage,
@@ -466,6 +577,8 @@ function QuestionCard({
             onChange={onNoteChange}
             onClear={onClearNote}
             inputRef={noteInputRef}
+            wrapEnabled={noteWrap}
+            onWrapChange={onNoteWrapChange}
           />
         ) : null}
         <div className="question-footer">
@@ -1316,6 +1429,7 @@ function App() {
         explanationImages={explanationImages}
         noteEnabled={settings.noteEnabled}
         noteValue={noteValue}
+        noteWrap={settings.noteWrap}
         noteInputRef={noteInputRef}
         hasPrev={hasPrev}
         hasNext={hasNext}
@@ -1325,6 +1439,9 @@ function App() {
         onCheckAnswer={() => handleCheckAnswer(q)}
         onNoteChange={(value) => updateNote(ds.key, q.id, value)}
         onClearNote={() => updateNote(ds.key, q.id, "")}
+        onNoteWrapChange={(value) =>
+          setStoredSettings((prev) => ({ ...prev, noteWrap: value }))
+        }
         onPrev={() => hasPrev && handleSelect(ds.key, filtered[index - 1].id)}
         onNext={() => hasNext && handleSelect(ds.key, filtered[index + 1].id)}
         onOpenImage={setLightboxSrc}
