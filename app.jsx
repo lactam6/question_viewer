@@ -35,6 +35,8 @@ const SHORTCUT_LABELS = {
   closeImage: "\u753b\u50cf\u62e1\u5927\u3092\u9589\u3058\u308b",
   checkToggle: "\u89e3\u7b54\u30c1\u30a7\u30c3\u30af\u3092\u30c8\u30b0\u30eb",
   noteFocus: "\u30ce\u30fc\u30c8\u3078\u30d5\u30a9\u30fc\u30ab\u30b9/\u89e3\u9664",
+  noteMoveLine: "\u30ce\u30fc\u30c8\u306e\u884c\u3092\u4e0a/\u4e0b\u306b\u79fb\u52d5",
+  noteCopyLine: "\u30ce\u30fc\u30c8\u306e\u884c\u3092\u4e0a/\u4e0b\u306b\u30b3\u30d4\u30fc",
 };
 
 const DESCRIPTIVE_TAG_KEY = "writing";
@@ -284,10 +286,77 @@ function ThemeToggle({ theme, onChange }) {
   );
 }
 
+function getLineStartOffsets(value) {
+  const offsets = [0];
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "\n") {
+      offsets.push(index + 1);
+    }
+  }
+  return offsets;
+}
+
+function getLineIndexFromOffset(lineStarts, offset) {
+  let lineIndex = 0;
+  for (let index = 0; index < lineStarts.length; index += 1) {
+    if (lineStarts[index] > offset) {
+      break;
+    }
+    lineIndex = index;
+  }
+  return lineIndex;
+}
+
+function clampSelectionOffset(value, max) {
+  return Math.max(0, Math.min(value, max));
+}
+
+function transformNoteLines(value, selectionStart, selectionEnd, direction, duplicate) {
+  const lines = value.split("\n");
+  const lineStarts = getLineStartOffsets(value);
+  const safeStart = clampSelectionOffset(selectionStart, value.length);
+  const safeEnd = clampSelectionOffset(selectionEnd, value.length);
+  const rangeStart = Math.min(safeStart, safeEnd);
+  const rangeEnd = Math.max(safeStart, safeEnd);
+  const effectiveEnd = rangeEnd > rangeStart ? rangeEnd - 1 : rangeEnd;
+  const startLine = getLineIndexFromOffset(lineStarts, rangeStart);
+  const endLine = getLineIndexFromOffset(lineStarts, effectiveEnd);
+  const movedLines = lines.slice(startLine, endLine + 1);
+
+  if (!duplicate) {
+    if (direction < 0 && startLine === 0) return null;
+    if (direction > 0 && endLine === lines.length - 1) return null;
+  }
+
+  const nextLines = [...lines];
+  let nextStartLine = startLine;
+
+  if (duplicate) {
+    nextStartLine = direction < 0 ? startLine : endLine + 1;
+    nextLines.splice(nextStartLine, 0, ...movedLines);
+  } else {
+    nextLines.splice(startLine, movedLines.length);
+    nextStartLine = direction < 0 ? startLine - 1 : startLine + 1;
+    nextLines.splice(nextStartLine, 0, ...movedLines);
+  }
+
+  const nextValue = nextLines.join("\n");
+  const nextLineStarts = getLineStartOffsets(nextValue);
+  const baseOffset = lineStarts[startLine];
+  const nextBaseOffset = nextLineStarts[nextStartLine];
+
+  return {
+    value: nextValue,
+    selectionStart: clampSelectionOffset(nextBaseOffset + (safeStart - baseOffset), nextValue.length),
+    selectionEnd: clampSelectionOffset(nextBaseOffset + (safeEnd - baseOffset), nextValue.length),
+  };
+}
+
 function NotePane({ value, onChange, onClear, inputRef, wrapEnabled, onWrapChange }) {
   const gutterRef = useRef(null);
   const textareaRef = useRef(null);
   const mirrorRef = useRef(null);
+  const pendingSelectionRef = useRef(null);
   const logicalLines = useMemo(() => value.split("\n"), [value]);
   const [mirrorWidth, setMirrorWidth] = useState(0);
   const [lineNumbers, setLineNumbers] = useState(["1"]);
@@ -369,6 +438,12 @@ function NotePane({ value, onChange, onClear, inputRef, wrapEnabled, onWrapChang
   useLayoutEffect(() => {
     if (!textareaRef.current) return;
 
+    if (pendingSelectionRef.current) {
+      const { selectionStart, selectionEnd } = pendingSelectionRef.current;
+      textareaRef.current.setSelectionRange(selectionStart, selectionEnd);
+      pendingSelectionRef.current = null;
+    }
+
     if (!isCompactNote) {
       textareaRef.current.style.height = "";
       return;
@@ -391,6 +466,40 @@ function NotePane({ value, onChange, onClear, inputRef, wrapEnabled, onWrapChang
     if (gutterRef.current) {
       gutterRef.current.style.transform = `translateY(-${event.target.scrollTop}px)`;
     }
+  }
+
+  function handleKeyDown(event) {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) {
+      return;
+    }
+
+    const direction = event.key === "ArrowUp" ? -1 : 1;
+    const nextState = transformNoteLines(
+      value,
+      event.currentTarget.selectionStart,
+      event.currentTarget.selectionEnd,
+      direction,
+      event.shiftKey
+    );
+
+    if (!nextState) {
+      return;
+    }
+
+    event.preventDefault();
+    if (nextState.value === value) {
+      event.currentTarget.setSelectionRange(
+        nextState.selectionStart,
+        nextState.selectionEnd
+      );
+      return;
+    }
+
+    pendingSelectionRef.current = {
+      selectionStart: nextState.selectionStart,
+      selectionEnd: nextState.selectionEnd,
+    };
+    onChange(nextState.value);
   }
 
   function setTextareaRef(node) {
@@ -437,6 +546,7 @@ function NotePane({ value, onChange, onClear, inputRef, wrapEnabled, onWrapChang
           className={`note-textarea ${wrapEnabled ? "wrapped" : ""}`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onKeyDown={handleKeyDown}
           onScroll={handleScroll}
           spellCheck={false}
           wrap={wrapEnabled ? "soft" : "off"}
@@ -893,6 +1003,14 @@ function Sidebar({
                   <div className="shortcut-item">
                     <kbd>Alt + N</kbd>
                     <span>{SHORTCUT_LABELS.noteFocus}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Alt + ↑ / ↓</kbd>
+                    <span>{SHORTCUT_LABELS.noteMoveLine}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Alt + Shift + ↑ / ↓</kbd>
+                    <span>{SHORTCUT_LABELS.noteCopyLine}</span>
                   </div>
                 </div>
               </div>
