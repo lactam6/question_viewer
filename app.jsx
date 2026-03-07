@@ -527,9 +527,13 @@ function DatasetItem({
   collapsed,
   progressEntries,
   selected,
+  noteEnabled,
   onToggle,
   onSelect,
+  onExportNotes,
+  onImportNotes,
 }) {
+  const importInputRef = useRef(null);
   const completedCount = dataset.questions.filter(
     (q) => progressEntries[q.id]?.status === "completed"
   ).length;
@@ -554,6 +558,35 @@ function DatasetItem({
         </div>
       </button>
       <div className={`dataset-questions ${collapsed ? "collapsed" : ""}`}>
+        {noteEnabled ? <div className="dataset-tools">
+          <button
+            type="button"
+            className="dataset-tool-btn"
+            onClick={() => onExportNotes(dataset)}
+          >
+            ノート書き出し
+          </button>
+          <button
+            type="button"
+            className="dataset-tool-btn"
+            onClick={() => importInputRef.current?.click()}
+          >
+            ノート読み込み
+          </button>
+          <input
+            ref={importInputRef}
+            className="dataset-import-input"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                onImportNotes(dataset, file);
+              }
+              event.target.value = "";
+            }}
+          />
+        </div> : null}
         {filtered.length === 0 ? (
           <div className="dataset-empty">該当する問題がありません</div>
         ) : (
@@ -613,11 +646,14 @@ function Sidebar({
   selected,
   onToggleDataset,
   onSelectQuestion,
+  onExportNotes,
+  onImportNotes,
   onThemeChange,
   shortcutOpen,
   onToggleShortcut,
   isMobileOpen,
   onClose,
+  onDismissBanner,
 }) {
   return (
     <aside className={`sidebar ${isMobileOpen ? "open" : ""}`}>
@@ -663,7 +699,19 @@ function Sidebar({
       </div>
 
       <div className="sidebar-scroll">
-        {banner ? <div className="status-banner">{banner}</div> : null}
+        {banner ? (
+          <div className="status-banner">
+            <span className="status-banner-text">{banner}</span>
+            <button
+              type="button"
+              className="status-banner-close"
+              onClick={onDismissBanner}
+              aria-label="通知を閉じる"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
 
         <div className="dataset-list">
           {datasets.map((ds) => (
@@ -674,8 +722,11 @@ function Sidebar({
               collapsed={collapsedMap[ds.key] ?? true}
               progressEntries={progressByDataset[ds.key] || {}}
               selected={selected}
+              noteEnabled={settings.noteEnabled}
               onToggle={() => onToggleDataset(ds.key)}
               onSelect={onSelectQuestion}
+              onExportNotes={onExportNotes}
+              onImportNotes={onImportNotes}
             />
           ))}
         </div>
@@ -1057,6 +1108,174 @@ function App() {
     });
   }
 
+  function replaceDatasetNotes(datasetKey, datasetNotes) {
+    setNotes((prev) => {
+      const next = { ...prev };
+      if (Object.keys(datasetNotes).length > 0) {
+        next[datasetKey] = datasetNotes;
+      } else {
+        delete next[datasetKey];
+      }
+      return next;
+    });
+  }
+
+  /*
+  function handleExportNotes(dataset) {
+    const datasetNotes = notes?.[dataset.key] || {};
+    const payload = dataset.questions
+      .map((question) => {
+        const rawNote = datasetNotes[question.id];
+        if (!rawNote) return null;
+        return {
+          id: question.id,
+          note: rawNote.split("\n"),
+        };
+      })
+      .filter(Boolean);
+
+    const filename = `${dataset.key.replace(/\.json$/i, "")}_notes.json`;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    setBanner(`${dataset.label} のノートを ${payload.length} 件書き出しました。`);
+  }
+
+  async function handleImportNotes(dataset, file) {
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        throw new Error("ノートJSONは配列形式で指定してください。");
+      }
+
+      const validIds = new Set(dataset.questions.map((question) => question.id));
+      const existingDatasetNotes = notes?.[dataset.key] || {};
+      const nextDatasetNotes = { ...existingDatasetNotes };
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      parsed.forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        if (typeof item.id !== "string" || !validIds.has(item.id)) return;
+        if (!Array.isArray(item.note)) return;
+
+        const noteText = item.note
+          .filter((line) => typeof line === "string")
+          .join("\n");
+
+        if (!noteText) return;
+
+        nextDatasetNotes[item.id] = noteText;
+        importedCount += 1;
+      });
+
+      replaceDatasetNotes(dataset.key, nextDatasetNotes);
+      setBanner(`${dataset.label} のノートを ${importedCount} 件読み込みました。`);
+    } catch (error) {
+      setBanner(
+        `${dataset.label} のノート読み込みに失敗しました: ${
+          error?.message || "JSONを確認してください。"
+        }`
+      );
+    }
+  }
+
+  */
+
+  function handleExportNotes(dataset) {
+    const datasetNotes = notes?.[dataset.key] || {};
+    const payload = dataset.questions
+      .map((question) => {
+        const rawNote = datasetNotes[question.id];
+        if (!rawNote) return null;
+        return {
+          id: question.id,
+          note: rawNote.split("\n"),
+        };
+      })
+      .filter(Boolean);
+
+    const filename = `${dataset.key.replace(/\.json$/i, "")}_notes.json`;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    setBanner(
+      `${dataset.label} \u306e\u30ce\u30fc\u30c8\u3092 ${payload.length} \u4ef6\u66f8\u304d\u51fa\u3057\u307e\u3057\u305f\u3002`
+    );
+  }
+
+  async function handleImportNotes(dataset, file) {
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        throw new Error(
+          "\u30ce\u30fc\u30c8JSON\u306f\u914d\u5217\u5f62\u5f0f\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
+        );
+      }
+
+      const validIds = new Set(dataset.questions.map((question) => question.id));
+      const existingDatasetNotes = notes?.[dataset.key] || {};
+      const nextDatasetNotes = { ...existingDatasetNotes };
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      parsed.forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        if (typeof item.id !== "string" || !validIds.has(item.id)) return;
+        if (!Array.isArray(item.note)) return;
+
+        const noteText = item.note
+          .filter((line) => typeof line === "string")
+          .join("\n");
+
+        if (!noteText) return;
+        if (existingDatasetNotes[item.id]) {
+          skippedCount += 1;
+          return;
+        }
+
+        nextDatasetNotes[item.id] = noteText;
+        importedCount += 1;
+      });
+
+      replaceDatasetNotes(dataset.key, nextDatasetNotes);
+      setBanner(
+        `${dataset.label} \u306e\u30ce\u30fc\u30c8\u3092 ${importedCount} \u4ef6\u8aad\u307f\u8fbc\u307f\u307e\u3057\u305f\u3002${
+          skippedCount
+            ? ` ${skippedCount} \u4ef6\u306f\u65e2\u5b58\u30ce\u30fc\u30c8\u304c\u3042\u308b\u305f\u3081\u4e0a\u66f8\u304d\u3057\u307e\u305b\u3093\u3067\u3057\u305f\u3002`
+            : ""
+        }`
+      );
+    } catch (error) {
+      setBanner(
+        `${dataset.label} \u306e\u30ce\u30fc\u30c8\u8aad\u307f\u8fbc\u307f\u306b\u5931\u6557\u3057\u307e\u3057\u305f: ${
+          error?.message ||
+          "JSON\u306e\u5f62\u5f0f\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
+        }`
+      );
+    }
+  }
+
   function renderMain() {
     if (!selected) {
       return (
@@ -1149,6 +1368,8 @@ function App() {
         selected={selected}
         onToggleDataset={handleToggleDataset}
         onSelectQuestion={handleSelect}
+        onExportNotes={handleExportNotes}
+        onImportNotes={handleImportNotes}
         onThemeChange={(theme) =>
           setStoredSettings((prev) => ({ ...prev, theme }))
         }
@@ -1156,6 +1377,7 @@ function App() {
         onToggleShortcut={() => setIsShortcutOpen((prev) => !prev)}
         isMobileOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onDismissBanner={() => setBanner("")}
       />
 
       <main className="main">{renderMain()}</main>

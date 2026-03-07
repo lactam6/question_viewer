@@ -472,6 +472,35 @@ body {
   transition: max-height var(--transition);
 }
 
+.dataset-tools {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.dataset-tool-btn {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.dataset-tool-btn:hover {
+  border-color: var(--accent);
+  background: var(--selected);
+}
+
+.dataset-import-input {
+  display: none;
+}
+
 .dataset-questions.collapsed {
   max-height: 0;
   overflow: hidden;
@@ -967,6 +996,30 @@ body {
   color: #8a4f08;
   font-size: 12px;
   line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-banner-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.8;
+}
+
+.status-banner-close:hover {
+  opacity: 1;
 }
 
 @media (max-width: 1024px) {
