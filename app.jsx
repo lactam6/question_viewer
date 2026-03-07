@@ -878,6 +878,34 @@ function Sidebar({
   onClose,
   onDismissBanner,
 }) {
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
+  const controlsToggleLabel = controlsCollapsed
+    ? "Expand sidebar filters"
+    : "Collapse sidebar filters";
+
+  function renderControlsToggle(extraClass = "") {
+    const className = [
+      "sidebar-controls-toggle",
+      controlsCollapsed ? "collapsed" : "",
+      extraClass,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => setControlsCollapsed((prev) => !prev)}
+        aria-label={controlsToggleLabel}
+        aria-expanded={!controlsCollapsed}
+        title={controlsToggleLabel}
+      >
+        <span aria-hidden="true">{">"}</span>
+      </button>
+    );
+  }
+
   return (
     <aside className={`sidebar ${isMobileOpen ? "open" : ""}`}>
       <div className="sidebar-header">
@@ -891,36 +919,49 @@ function Sidebar({
         </button>
       </div>
 
-      <StatusTabs value={statusFilter} onChange={onStatusFilterChange} />
+      <div className="sidebar-controls">
+        <div
+          className={`sidebar-controls-expanded ${controlsCollapsed ? "collapsed" : ""}`}
+          aria-hidden={controlsCollapsed}
+        >
+          <StatusTabs value={statusFilter} onChange={onStatusFilterChange} />
 
-      <div className="search-box">
-        <input
-          value={keyword}
-          onChange={(event) => onKeywordChange(event.target.value)}
-          type="text"
-          placeholder="キーワード検索..."
-        />
+          <div className="search-box">
+            <input
+              value={keyword}
+              onChange={(event) => onKeywordChange(event.target.value)}
+              type="text"
+              placeholder="キーワード検索..."
+            />
+          </div>
+
+          <div className="settings-row settings-row-collapsible">
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.autoComplete}
+                onChange={(event) => onSettingsChange({ autoComplete: event.target.checked })}
+              />
+              <span>{"\u6b63\u89e3\u3067\u81ea\u52d5\u5b8c\u4e86"}</span>
+            </label>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.noteEnabled}
+                onChange={(event) => onSettingsChange({ noteEnabled: event.target.checked })}
+              />
+              <span>ノート機能</span>
+            </label>
+            {renderControlsToggle()}
+          </div>
+        </div>
+        <div
+          className={`sidebar-controls-collapsed-bar ${controlsCollapsed ? "visible" : ""}`}
+          aria-hidden={!controlsCollapsed}
+        >
+          {renderControlsToggle("collapsed-bar-toggle")}
+        </div>
       </div>
-
-      <div className="settings-row">
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={settings.autoComplete}
-            onChange={(event) => onSettingsChange({ autoComplete: event.target.checked })}
-          />
-          <span>{"\u6b63\u89e3\u3067\u81ea\u52d5\u5b8c\u4e86"}</span>
-        </label>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={settings.noteEnabled}
-            onChange={(event) => onSettingsChange({ noteEnabled: event.target.checked })}
-          />
-          <span>ノート機能</span>
-        </label>
-      </div>
-
       <div className="sidebar-scroll">
         {banner ? (
           <div className="status-banner">
