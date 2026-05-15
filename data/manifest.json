@@ -1,6 +1,3 @@
 ﻿[
-  { "file": "bacteriology_text.json", "label": "細菌感染シケタイ.json" },
-  { "file": "immunology.json", "label": "免疫学小テスト.json" },
-  { "file": "virology-writing.json", "label": "ウイルス学記述.json" },
    { "file": "pathology.json", "label": "病理学2.json" }
 ]
